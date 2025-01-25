@@ -1,0 +1,96 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          pytest tests/  
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Pylint
+        run: |
+          pylint app.py tests/test_app.py
+
+  dynamic-analysis:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Start application (ensure it's running)
+        run: |
+          nohup python app.py &  # Start your Flask app in the background
+
+      - name: Run Burp Suite scan (using Docker)
+        run: |
+          docker run --rm -d --name burp \
+            -p 8080:8080 \
+            portswigger/burp-suite-community \
+            /bin/sh -c "java -jar /burpsuite/burpsuite.jar"
+        
+      - name: Wait for Burp Suite to start
+        run: |
+          sleep 30  # Adjust this time as necessary for Burp to start up
+
+      - name: Run scan against the application
+        run: |
+          curl --proxy http://localhost:8080 http://localhost:5000 > burp_scan_report.txt
+        
+      - name: Stop Burp Suite container
+        run: |
+          docker stop burp
